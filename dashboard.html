@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automatic Sliding Door — Project Dashboard</title>
+<style>
+  /* ── Reset & Base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Slate palette — grounded, no neon */
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --surface-2: #222632;
+    --border:    #2e3345;
+    --text:      #e2e4ea;
+    --text-dim:  #8b8fa3;
+    --accent:    #3b82f6;          /* single purposeful blue accent */
+    --accent-lo: rgba(59,130,246,0.12);
+    --green:     #22c55e;
+    --green-lo:  rgba(34,197,94,0.12);
+    --amber:     #f59e0b;
+    --amber-lo:  rgba(245,158,11,0.12);
+    --red:       #ef4444;
+    --red-lo:    rgba(239,68,68,0.12);
+    --radius:    6px;
+    --mono:      'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+  }
+
+  html { font-size: 14px; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────────── */
+  .shell {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 24px 28px 48px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  header h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  header .meta {
+    display: flex;
+    gap: 20px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+  }
+
+  header .meta span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── KPI Strip ────────────────────────────────────────────────── */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+
+  .kpi .label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .kpi .value {
+    font-size: 1.55rem;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: -0.03em;
+  }
+
+  .kpi .sub {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── Cards ────────────────────────────────────────────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  .card h2 {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .card h2 .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  .full-width { grid-column: 1 / -1; }
+
+  /* ── FSM Diagram (SVG) ────────────────────────────────────────── */
+  .fsm-container { position: relative; }
+
+  .fsm-container svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .fsm-node {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .fsm-node:hover { opacity: 0.8; }
+
+  .fsm-node rect {
+    stroke-width: 1.5;
+    rx: 4; ry: 4;
+  }
+
+  .fsm-node text {
+    font-family: var(--mono);
+    font-size: 11px;
+    fill: var(--text);
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+
+  .fsm-edge line, .fsm-edge path {
+    stroke: var(--border);
+    stroke-width: 1;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+
+  .fsm-edge text {
+    font-size: 9px;
+    fill: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  .fsm-node.active rect {
+    stroke: var(--accent);
+    filter: none;
+  }
+
+  .fsm-legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .fsm-legend span {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .fsm-legend .swatch {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* ── State Detail Panel ───────────────────────────────────────── */
+  .state-detail {
+    margin-top: 14px;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: none;
+  }
+
+  .state-detail.visible { display: block; }
+
+  .state-detail h3 {
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+
+  .state-detail p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .state-detail .tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 6px;
+    margin-top: 6px;
+  }
+
+  .tag-output  { background: var(--accent-lo); color: var(--accent); }
+  .tag-guard   { background: var(--amber-lo);  color: var(--amber); }
+
+  /* ── Sensor Gauge ─────────────────────────────────────────────── */
+  .gauge-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .gauge-ring {
+    width: 110px; height: 110px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .gauge-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+  .gauge-ring .track {
+    fill: none;
+    stroke: var(--surface-2);
+    stroke-width: 7;
+  }
+
+  .gauge-ring .fill-arc {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 7;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s ease;
+  }
+
+  .gauge-ring .reading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .gauge-ring .reading small {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+
+  .gauge-info { flex: 1; }
+
+  .gauge-info .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+  }
+
+  .gauge-info .row:last-child { border-bottom: none; }
+  .gauge-info .row .lbl { color: var(--text-dim); }
+
+  /* ── PWM Bar ──────────────────────────────────────────────────── */
+  .pwm-bar-wrap {
+    margin-top: 14px;
+  }
+
+  .pwm-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+  }
+
+  .pwm-label-row .lbl { color: var(--text-dim); }
+
+  .pwm-track {
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .pwm-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* ── Schedule Table ───────────────────────────────────────────── */
+  table.schedule {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+
+  table.schedule th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  table.schedule td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.schedule tr:last-child td { border-bottom: none; }
+
+  table.schedule .bar-cell {
+    width: 120px;
+  }
+
+  .util-bar {
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .util-bar .fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  /* ── Requirements Checklist ───────────────────────────────────── */
+  .req-list { list-style: none; }
+
+  .req-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+  }
+
+  .req-list li:last-child { border-bottom: none; }
+
+  .req-list .icon {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+
+  .icon-pass { background: var(--green-lo); color: var(--green); }
+  .icon-warn { background: var(--amber-lo); color: var(--amber); }
+
+  .req-list .id {
+    font-family: var(--mono);
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    min-width: 28px;
+  }
+
+  .req-list .desc { flex: 1; }
+
+  .req-list .result {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-align: right;
+    white-space: nowrap;
+    color: var(--text-dim);
+  }
+
+  /* ── BOM Table ────────────────────────────────────────────────── */
+  table.bom {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+
+  table.bom th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  table.bom td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.bom tr:last-child td { border-bottom: none; }
+
+  table.bom .cost {
+    font-family: var(--mono);
+    text-align: right;
+  }
+
+  table.bom tfoot td {
+    font-weight: 700;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  /* ── Architecture Block ───────────────────────────────────────── */
+  .arch-blocks {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .arch-block {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    text-align: center;
+    min-width: 110px;
+    font-size: 0.78rem;
+  }
+
+  .arch-block .name {
+    font-weight: 600;
+    font-size: 0.82rem;
+    margin-bottom: 3px;
+  }
+
+  .arch-block .spec {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  .arch-arrow {
+    font-size: 1.1rem;
+    color: var(--text-dim);
+    padding: 0 6px;
+  }
+
+  /* ── Pin Map ──────────────────────────────────────────────────── */
+  .pin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 18px;
+    font-size: 0.78rem;
+  }
+
+  .pin-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pin-row:last-child { border-bottom: none; }
+
+  .pin-row .pin {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 0.75rem;
+  }
+
+  .pin-row .fn {
+    color: var(--text-dim);
+  }
+
+  /* ── Memory Bar ───────────────────────────────────────────────── */
+  .mem-bars { margin-top: 4px; }
+
+  .mem-item {
+    margin-bottom: 12px;
+  }
+
+  .mem-item .mem-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+  }
+
+  .mem-item .mem-label .lbl { color: var(--text-dim); }
+  .mem-item .mem-label .val { font-family: var(--mono); }
+
+  .mem-track {
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .mem-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  /* ── Tabs ──────────────────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.78rem;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab-btn:hover { color: var(--text); opacity: 0.8; }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Footer ───────────────────────────────────────────────────── */
+  footer {
+    text-align: center;
+    padding: 24px 0 0;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+
+  /* ── Simulation Controls ──────────────────────────────────────── */
+  .sim-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .sim-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 7px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .sim-btn:hover { opacity: 0.8; }
+
+  .sim-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .sim-btn.danger {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  /* ── Log ───────────────────────────────────────────────────────── */
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    height: 160px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+
+  .log-box .ts { color: var(--text-dim); }
+  .log-box .ev { color: var(--accent); }
+  .log-box .warn { color: var(--amber); }
+  .log-box .err { color: var(--red); }
+
+  /* ── Responsive ───────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .gauge-row { flex-direction: column; }
+    .arch-blocks { flex-direction: column; }
+    .arch-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ════════ Header ════════ -->
+  <header>
+    <h1>Automatic Sliding Door — ESA Dashboard</h1>
+    <div class="meta">
+      <span>BACSE324 · Fall 2026</span>
+      <span>Meet Chavda · Sreyas S</span>
+      <span id="clock"></span>
+    </div>
+  </header>
+
+  <!-- ════════ KPI Strip ════════ -->
+  <div class="kpi-strip">
+    <div class="kpi">
+      <div class="label">FSM State</div>
+      <div class="value" id="kpi-state" style="color:var(--green);">CLOSED</div>
+      <div class="sub">6-state Mealy machine</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Response Latency</div>
+      <div class="value" id="kpi-latency">73 ms</div>
+      <div class="sub">target ≤ 100 ms</div>
+    </div>
+    <div class="kpi">
+      <div class="label">CPU Utilisation</div>
+      <div class="value">48.5%</div>
+      <div class="sub">cyclic exec · 50 ms frame</div>
+    </div>
+    <div class="kpi">
+      <div class="label">BOM Cost</div>
+      <div class="value">₹1,845</div>
+      <div class="sub">budget ₹2,500 (26% margin)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Obstruction Det.</div>
+      <div class="value">52 ms</div>
+      <div class="sub">200 ms decel pause</div>
+    </div>
+  </div>
+
+  <!-- ════════ Row 1: FSM + Sensor ════════ -->
+  <div class="grid-2">
+
+    <!-- FSM Diagram -->
+    <div class="card">
+      <h2><span class="dot"></span>Finite State Machine</h2>
+      <div class="fsm-container">
+        <svg viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#2e3345" />
+            </marker>
+          </defs>
+
+          <!-- Edges (drawn first, behind nodes) -->
+          <g class="fsm-edge">
+            <!-- CLOSED → OPENING -->
+            <line x1="130" y1="60" x2="278" y2="60" />
+            <text x="200" y="50">dist &lt; 60cm</text>
+
+            <!-- OPENING → OPEN_HOLD -->
+            <line x1="390" y1="80" x2="430" y2="148" />
+            <text x="425" y="110">limitOpen</text>
+
+            <!-- OPEN_HOLD → CLOSING -->
+            <line x1="430" y1="192" x2="390" y2="258" />
+            <text x="428" y="228">timer = 0</text>
+
+            <!-- CLOSING → CLOSED -->
+            <line x1="280" y1="278" x2="130" y2="278" />
+            <text x="200" y="268">limitClosed</text>
+
+            <!-- CLOSING → OBSTRUCTED -->
+            <line x1="280" y1="278" x2="200" y2="178" />
+            <text x="225" y="218">dist &lt; 60</text>
+
+            <!-- OBSTRUCTED → OPENING -->
+            <line x1="200" y1="148" x2="280" y2="80" />
+            <text x="224" y="108">decel done</text>
+
+            <!-- OPENING → FAULT -->
+            <path d="M 340 80 Q 340 140 260 168" />
+            <text x="305" y="135">stall 3.0s</text>
+
+            <!-- CLOSING → FAULT -->
+            <path d="M 340 258 Q 340 210 260 192" />
+            <text x="305" y="230">stall 3.0s</text>
+
+            <!-- OPEN_HOLD re-arm -->
+            <path d="M 480 170 Q 510 170 510 140 Q 510 110 480 140" />
+            <text x="498" y="125" font-size="8">presence</text>
+          </g>
+
+          <!-- Nodes -->
+          <g class="fsm-node active" data-state="CLOSED" onclick="selectState('CLOSED')">
+            <rect x="40" y="38" width="90" height="44" fill="var(--surface-2)" stroke="var(--green)" />
+            <text x="85" y="60">CLOSED</text>
+          </g>
+          <g class="fsm-node" data-state="OPENING" onclick="selectState('OPENING')">
+            <rect x="280" y="38" width="110" height="44" fill="var(--surface-2)" stroke="var(--border)" />
+            <text x="335" y="60">OPENING</text>
+          </g>
+          <g class="fsm-node" data-state="OPEN_HOLD" onclick="selectState('OPEN_HOLD')">
+            <rect x="420" y="148" width="110" height="44" fill="var(--surface-2)" stroke="var(--border)" />
+            <text x="475" y="170">OPEN_HOLD</text>
+          </g>
+          <g class="fsm-node" data-state="CLOSING" onclick="selectState('CLOSING')">
+            <rect x="280" y="256" width="110" height="44" fill="var(--surface-2)" stroke="var(--border)" />
+            <text x="335" y="278">CLOSING</text>
+          </g>
+          <g class="fsm-node" data-state="OBSTRUCTED" onclick="selectState('OBSTRUCTED')">
+            <rect x="115" y="148" width="120" height="44" fill="var(--surface-2)" stroke="var(--border)" />
+            <text x="175" y="170">OBSTRUCTED</text>
+          </g>
+          <g class="fsm-node" data-state="FAULT" onclick="selectState('FAULT')">
+            <rect x="245" y="148" width="90" height="44" fill="var(--surface-2)" stroke="var(--red)" />
+            <text x="290" y="170" fill="var(--red)">FAULT</text>
+          </g>
+        </svg>
+      </div>
+      <div class="fsm-legend">
+        <span><span class="swatch" style="background:var(--green)"></span>Idle / safe</span>
+        <span><span class="swatch" style="background:var(--accent)"></span>Active</span>
+        <span><span class="swatch" style="background:var(--amber)"></span>Guard</span>
+        <span><span class="swatch" style="background:var(--red)"></span>Fault</span>
+      </div>
+      <div class="state-detail visible" id="state-detail">
+        <h3 id="sd-name">CLOSED</h3>
+        <p id="sd-desc">Motors off. Door at closed limit. System idle, waiting for ultrasonic detection of presence within 60 cm threshold.</p>
+        <div id="sd-tags">
+          <span class="tag tag-output">OUT: motors = OFF</span>
+          <span class="tag tag-output">OUT: LCD = "Door Closed"</span>
+          <span class="tag tag-guard">GUARD: dist &lt; 60 cm → OPENING</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sensor & Motor Panel -->
+    <div class="card">
+      <h2><span class="dot"></span>Sensor &amp; Actuator Status</h2>
+
+      <!-- Distance gauge -->
+      <div class="gauge-row">
+        <div class="gauge-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="track" cx="60" cy="60" r="48" />
+            <circle class="fill-arc" id="dist-arc" cx="60" cy="60" r="48"
+              stroke-dasharray="301.6"
+              stroke-dashoffset="75.4" />
+          </svg>
+          <div class="reading">
+            <span id="dist-val">120</span>
+            <small>cm</small>
+          </div>
+        </div>
+        <div class="gauge-info">
+          <div class="row"><span class="lbl">Sensor</span><span>HC-SR04</span></div>
+          <div class="row"><span class="lbl">Range</span><span>2 – 400 cm</span></div>
+          <div class="row"><span class="lbl">Threshold</span><span>60 cm</span></div>
+          <div class="row"><span class="lbl">WCET (pulseIn)</span><span>23.2 ms</span></div>
+          <div class="row"><span class="lbl">Calc method</span><span>duration / 58 (int)</span></div>
+        </div>
+      </div>
+
+      <!-- PWM Duty -->
+      <div class="pwm-bar-wrap">
+        <div class="pwm-label-row">
+          <span class="lbl">Motor PWM duty</span>
+          <span id="pwm-val" style="font-family:var(--mono)">0 / 255</span>
+        </div>
+        <div class="pwm-track">
+          <div class="pwm-fill" id="pwm-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="pwm-label-row">
+          <span class="lbl">Soft-ramp profile</span>
+          <span style="font-family:var(--mono)">60 → 200 over 480 ms</span>
+        </div>
+      </div>
+
+      <!-- Limit switches -->
+      <div style="margin-top:16px; display:flex; gap:24px;">
+        <div>
+          <div class="pwm-label-row"><span class="lbl">Limit — Closed (D2/INT0)</span></div>
+          <span id="sw-closed" style="font-family:var(--mono); color:var(--green);">● ACTIVE</span>
+        </div>
+        <div>
+          <div class="pwm-label-row"><span class="lbl">Limit — Open (D4)</span></div>
+          <span id="sw-open" style="font-family:var(--mono); color:var(--text-dim);">○ INACTIVE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ Row 2: Architecture + Pin Map + Memory ════════ -->
+  <div class="grid-3">
+
+    <!-- Architecture -->
+    <div class="card">
+      <h2><span class="dot"></span>System Architecture</h2>
+      <div class="arch-blocks">
+        <div class="arch-block">
+          <div class="name">HC-SR04</div>
+          <div class="spec">TRIG D7 · ECHO D8</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-block" style="border-color:var(--accent);">
+          <div class="name">ATmega328P</div>
+          <div class="spec">16 MHz · 32 KB Flash</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-block">
+          <div class="name">L298N</div>
+          <div class="spec">ENA D3 · ENB D11</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-block">
+          <div class="name">2× DC Motors</div>
+          <div class="spec">12 V gear · 60 cm belt</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="arch-blocks">
+          <div class="arch-block">
+            <div class="name">I2C LCD</div>
+            <div class="spec">16×2 · 0x27 · A4/A5</div>
+          </div>
+          <div class="arch-arrow" style="visibility:hidden">→</div>
+          <div class="arch-block">
+            <div class="name">Limit SW</div>
+            <div class="spec">D2 (INT0) · D4 (dig)</div>
+          </div>
+          <div class="arch-arrow" style="visibility:hidden">→</div>
+          <div class="arch-block">
+            <div class="name">12 V PSU</div>
+            <div class="spec">2 A adapter → 5 V reg</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pin Map -->
+    <div class="card">
+      <h2><span class="dot"></span>Pin Allocation</h2>
+      <div class="pin-grid">
+        <div class="pin-row"><span class="fn">Limit closed (INT0)</span><span class="pin">D2</span></div>
+        <div class="pin-row"><span class="fn">Motor A PWM (ENA)</span><span class="pin">D3</span></div>
+        <div class="pin-row"><span class="fn">Limit open</span><span class="pin">D4</span></div>
+        <div class="pin-row"><span class="fn">Motor B IN3</span><span class="pin">D5</span></div>
+        <div class="pin-row"><span class="fn">Motor B IN4</span><span class="pin">D6</span></div>
+        <div class="pin-row"><span class="fn">Ultrasonic TRIG</span><span class="pin">D7</span></div>
+        <div class="pin-row"><span class="fn">Ultrasonic ECHO</span><span class="pin">D8</span></div>
+        <div class="pin-row"><span class="fn">Motor A IN1</span><span class="pin">D9</span></div>
+        <div class="pin-row"><span class="fn">Motor A IN2</span><span class="pin">D10</span></div>
+        <div class="pin-row"><span class="fn">Motor B PWM (ENB)</span><span class="pin">D11</span></div>
+        <div class="pin-row"><span class="fn">I2C SDA</span><span class="pin">A4</span></div>
+        <div class="pin-row"><span class="fn">I2C SCL</span><span class="pin">A5</span></div>
+      </div>
+    </div>
+
+    <!-- Memory / Resources -->
+    <div class="card">
+      <h2><span class="dot"></span>Resource Usage</h2>
+      <div class="mem-bars">
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">Flash (program)</span><span class="val">13,312 / 32,768 B</span></div>
+          <div class="mem-track"><div class="mem-fill" style="width:40.6%; background:var(--accent);"></div></div>
+        </div>
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">SRAM (data)</span><span class="val">824 / 2,048 B</span></div>
+          <div class="mem-track"><div class="mem-fill" style="width:40.2%; background:var(--amber);"></div></div>
+        </div>
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">Digital pins used</span><span class="val">10 / 14</span></div>
+          <div class="mem-track"><div class="mem-fill" style="width:71.4%; background:var(--green);"></div></div>
+        </div>
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">Analog pins used</span><span class="val">2 / 6</span></div>
+          <div class="mem-track"><div class="mem-fill" style="width:33.3%; background:var(--green);"></div></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">Flash saved (optimisation)</span><span class="val">−1,536 B (−10.4%)</span></div>
+        </div>
+        <div class="mem-item">
+          <div class="mem-label"><span class="lbl">N7 latency reduction</span><span class="val">28 → 11 µs (−61%)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ Row 3: Schedule + Requirements ════════ -->
+  <div class="grid-2">
+
+    <!-- Task Schedule -->
+    <div class="card">
+      <h2><span class="dot"></span>Cyclic Executive Schedule</h2>
+      <table class="schedule">
+        <thead>
+          <tr><th>Task</th><th>Period</th><th>WCET</th><th>Util.</th><th class="bar-cell">Load</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>T1 — Ultrasonic read</td><td style="font-family:var(--mono)">50 ms</td><td style="font-family:var(--mono)">23.2 ms</td><td style="font-family:var(--mono)">46.4%</td>
+            <td class="bar-cell"><div class="util-bar"><div class="fill" style="width:46.4%;background:var(--amber);"></div></div></td>
+          </tr>
+          <tr>
+            <td>T2 — FSM evaluate</td><td style="font-family:var(--mono)">50 ms</td><td style="font-family:var(--mono)">0.28 ms</td><td style="font-family:var(--mono)">0.56%</td>
+            <td class="bar-cell"><div class="util-bar"><div class="fill" style="width:0.56%;background:var(--green);"></div></div></td>
+          </tr>
+          <tr>
+            <td>T3 — Motor update</td><td style="font-family:var(--mono)">50 ms</td><td style="font-family:var(--mono)">0.11 ms</td><td style="font-family:var(--mono)">0.22%</td>
+            <td class="bar-cell"><div class="util-bar"><div class="fill" style="width:0.22%;background:var(--green);"></div></div></td>
+          </tr>
+          <tr>
+            <td>T4 — LCD refresh</td><td style="font-family:var(--mono)">200 ms</td><td style="font-family:var(--mono)">2.6 ms</td><td style="font-family:var(--mono)">1.30%</td>
+            <td class="bar-cell"><div class="util-bar"><div class="fill" style="width:1.3%;background:var(--green);"></div></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px; font-size:0.75rem; color:var(--text-dim);">
+        Hyperperiod = 1000 ms · Total U = 48.5% · Schedulable (U &lt; 1.0)
+      </div>
+    </div>
+
+    <!-- Requirements Verification -->
+    <div class="card">
+      <h2><span class="dot"></span>Requirements Verification</h2>
+      <ul class="req-list">
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R1</span>
+          <span class="desc">Detect presence within 60 cm</span>
+          <span class="result" style="color:var(--green);">PASS · 73 ms</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R2</span>
+          <span class="desc">Response latency ≤ 100 ms</span>
+          <span class="result" style="color:var(--green);">PASS · 73 ms</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R3</span>
+          <span class="desc">Full open/close in ≤ 3 s</span>
+          <span class="result" style="color:var(--green);">PASS · 2.1 s</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R4</span>
+          <span class="desc">Obstruction detect &lt; 200 ms</span>
+          <span class="result" style="color:var(--green);">PASS · 52 ms</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R5</span>
+          <span class="desc">Hold open 5 s, re-arm on presence</span>
+          <span class="result" style="color:var(--green);">PASS</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R6</span>
+          <span class="desc">Soft-ramp PWM (no current spike)</span>
+          <span class="result" style="color:var(--green);">PASS · 480 ms</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R7</span>
+          <span class="desc">Fault latch on 3.0 s stall</span>
+          <span class="result" style="color:var(--green);">PASS</span>
+        </li>
+        <li>
+          <span class="icon icon-pass">✓</span>
+          <span class="id">R8</span>
+          <span class="desc">Budget ≤ ₹2,500</span>
+          <span class="result" style="color:var(--green);">PASS · ₹1,845</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ════════ Row 4: BOM + Simulation ════════ -->
+  <div class="grid-2">
+
+    <!-- BOM -->
+    <div class="card">
+      <h2><span class="dot"></span>Bill of Materials</h2>
+      <table class="bom">
+        <thead><tr><th>Component</th><th>Qty</th><th style="text-align:right">Cost (₹)</th></tr></thead>
+        <tbody>
+          <tr><td>Arduino Uno R3</td><td>1</td><td class="cost">550</td></tr>
+          <tr><td>HC-SR04 Ultrasonic</td><td>1</td><td class="cost">85</td></tr>
+          <tr><td>L298N Motor Driver</td><td>1</td><td class="cost">180</td></tr>
+          <tr><td>12 V DC Gear Motor</td><td>2</td><td class="cost">300</td></tr>
+          <tr><td>16×2 I2C LCD</td><td>1</td><td class="cost">200</td></tr>
+          <tr><td>Micro Limit Switch</td><td>2</td><td class="cost">30</td></tr>
+          <tr><td>12 V / 2 A Adapter</td><td>1</td><td class="cost">250</td></tr>
+          <tr><td>Breadboard + Jumpers</td><td>1 set</td><td class="cost">150</td></tr>
+          <tr><td>Belt/Rack mechanism</td><td>1</td><td class="cost">100</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2">Total</td><td class="cost">₹1,845</td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Simulation Panel -->
+    <div class="card">
+      <h2><span class="dot"></span>Live Simulation</h2>
+      <div class="sim-controls">
+        <button class="sim-btn primary" onclick="simStart()">▶ Run</button>
+        <button class="sim-btn" onclick="simPause()">⏸ Pause</button>
+        <button class="sim-btn danger" onclick="simReset()">⟲ Reset</button>
+        <button class="sim-btn" onclick="simInject('person')">Person enters</button>
+        <button class="sim-btn" onclick="simInject('obstruct')">Obstruct</button>
+        <button class="sim-btn" onclick="simInject('clear')">Clear path</button>
+        <button class="sim-btn danger" onclick="simInject('fault')">Force fault</button>
+      </div>
+      <div class="log-box" id="log-box">
+        <div><span class="ts">00:00.000</span> System initialised — state CLOSED</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ Row 5: Team + Optimisation ════════ -->
+  <div class="grid-2">
+    <div class="card">
+      <h2><span class="dot"></span>Team Contributions</h2>
+      <table class="bom">
+        <thead><tr><th>Member</th><th>Responsibilities</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;">Meet Chavda<br><span style="font-size:0.7rem;color:var(--text-dim);">25BCE2491</span></td>
+              <td>Firmware design, FSM logic, presence detection, timer control, PWM calibration, cyclic executive, optimisation</td></tr>
+          <tr><td style="font-weight:600;">Sreyas S<br><span style="font-size:0.7rem;color:var(--text-dim);">25BCE2496</span></td>
+              <td>Mechanical assembly, motor driver interfacing, sensor integration, limit switch wiring, hardware build</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Optimisation Summary</h2>
+      <table class="bom">
+        <thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Δ</th></tr></thead>
+        <tbody>
+          <tr><td>Flash usage</td><td style="font-family:var(--mono)">14,848 B</td><td style="font-family:var(--mono)">13,312 B</td><td style="font-family:var(--mono);color:var(--green);">−10.4%</td></tr>
+          <tr><td>N7 ISR latency</td><td style="font-family:var(--mono)">28 µs</td><td style="font-family:var(--mono)">11 µs</td><td style="font-family:var(--mono);color:var(--green);">−61%</td></tr>
+          <tr><td>Distance calc</td><td style="font-family:var(--mono)">float / 58.0</td><td style="font-family:var(--mono)">int / 58</td><td style="font-family:var(--mono);color:var(--green);">no FP</td></tr>
+          <tr><td>LCD refresh</td><td style="font-family:var(--mono)">50 ms</td><td style="font-family:var(--mono)">200 ms</td><td style="font-family:var(--mono);color:var(--green);">−3.9% U</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    BACSE324 Embedded Systems Architecture · Fall 2026 · VIT Vellore
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     JavaScript — State data flow & simulation engine
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  'use strict';
+
+  // ── Clock ──
+  function tickClock() {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      d.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // ── FSM State Data ──
+  const stateData = {
+    CLOSED: {
+      color: 'var(--green)',
+      desc: 'Motors off. Door at closed limit. System idle, waiting for presence within 60 cm.',
+      outputs: ['OUT: motors = OFF', 'OUT: LCD = "Door Closed"'],
+      guards: ['GUARD: dist < 60 cm → OPENING'],
+      pwm: 0, distDefault: 120, swClosed: true, swOpen: false,
+    },
+    OPENING: {
+      color: 'var(--accent)',
+      desc: 'Soft-ramp PWM drives motors forward (duty 60→200 over 480 ms). Stall timer armed at 3.0 s.',
+      outputs: ['OUT: motors = FWD', 'OUT: PWM ramp 60→200', 'OUT: LCD = "Opening..."'],
+      guards: ['GUARD: limitOpen → OPEN_HOLD', 'GUARD: stall 3.0 s → FAULT'],
+      pwm: 200, distDefault: 45, swClosed: false, swOpen: false,
+    },
+    OPEN_HOLD: {
+      color: 'var(--accent)',
+      desc: 'Door fully open. 5-second countdown active. Presence re-arms timer.',
+      outputs: ['OUT: motors = OFF', 'OUT: LCD = "Open [5s]"'],
+      guards: ['GUARD: timer = 0 → CLOSING', 'GUARD: dist < 60 → re-arm timer'],
+      pwm: 0, distDefault: 30, swClosed: false, swOpen: true,
+    },
+    CLOSING: {
+      color: 'var(--accent)',
+      desc: 'Soft-ramp PWM drives motors reverse. Monitors for obstruction.',
+      outputs: ['OUT: motors = REV', 'OUT: PWM ramp 60→200', 'OUT: LCD = "Closing..."'],
+      guards: ['GUARD: limitClosed → CLOSED', 'GUARD: dist < 60 → OBSTRUCTED', 'GUARD: stall 3.0 s → FAULT'],
+      pwm: 200, distDefault: 100, swClosed: false, swOpen: false,
+    },
+    OBSTRUCTED: {
+      color: 'var(--amber)',
+      desc: 'Obstruction detected during close. Motors braked for 200 ms deceleration pause, then re-open.',
+      outputs: ['OUT: motors = BRAKE', 'OUT: LCD = "Obstructed!"'],
+      guards: ['GUARD: decel 200 ms done → OPENING'],
+      pwm: 0, distDefault: 40, swClosed: false, swOpen: false,
+    },
+    FAULT: {
+      color: 'var(--red)',
+      desc: 'Stall detected — motor did not reach limit within 3.0 s. Motors off, state latched. Requires power-cycle reset.',
+      outputs: ['OUT: motors = OFF', 'OUT: LCD = "FAULT!"'],
+      guards: ['GUARD: none (latched safe state)'],
+      pwm: 0, distDefault: 100, swClosed: false, swOpen: false,
+    },
+  };
+
+  let currentState = 'CLOSED';
+
+  // ── Select state (click on FSM node) ──
+  window.selectState = function(name) {
+    currentState = name;
+    renderState();
+  };
+
+  function renderState() {
+    const s = stateData[currentState];
+    if (!s) return;
+
+    // KPI
+    const kpi = document.getElementById('kpi-state');
+    kpi.textContent = currentState;
+    kpi.style.color = s.color;
+
+    // Highlight active node
+    document.querySelectorAll('.fsm-node').forEach(n => {
+      const isActive = n.dataset.state === currentState;
+      n.classList.toggle('active', isActive);
+      const rect = n.querySelector('rect');
+      if (isActive) {
+        rect.setAttribute('stroke', s.color);
+      } else if (n.dataset.state === 'FAULT') {
+        rect.setAttribute('stroke', 'var(--red)');
+      } else if (n.dataset.state === 'CLOSED') {
+        rect.setAttribute('stroke', 'var(--green)');
+      } else {
+        rect.setAttribute('stroke', 'var(--border)');
+      }
+    });
+
+    // State detail
+    document.getElementById('sd-name').textContent = currentState;
+    document.getElementById('sd-name').style.color = s.color;
+    document.getElementById('sd-desc').textContent = s.desc;
+    const tags = document.getElementById('sd-tags');
+    tags.innerHTML = '';
+    s.outputs.forEach(o => {
+      const sp = document.createElement('span');
+      sp.className = 'tag tag-output';
+      sp.textContent = o;
+      tags.appendChild(sp);
+    });
+    s.guards.forEach(g => {
+      const sp = document.createElement('span');
+      sp.className = 'tag tag-guard';
+      sp.textContent = g;
+      tags.appendChild(sp);
+    });
+
+    // Gauge & indicators
+    updateDist(s.distDefault);
+    updatePWM(s.pwm);
+    updateSwitches(s.swClosed, s.swOpen);
+  }
+
+  function updateDist(cm) {
+    const frac = Math.min(cm / 400, 1);
+    const circ = 301.6;
+    document.getElementById('dist-arc').setAttribute('stroke-dashoffset', circ * (1 - frac));
+    // Color accent if below threshold
+    const arc = document.getElementById('dist-arc');
+    arc.setAttribute('stroke', cm < 60 ? 'var(--green)' : 'var(--accent)');
+    document.getElementById('dist-val').textContent = cm;
+  }
+
+  function updatePWM(duty) {
+    const pct = (duty / 255 * 100).toFixed(1);
+    document.getElementById('pwm-fill').style.width = pct + '%';
+    document.getElementById('pwm-val').textContent = duty + ' / 255';
+  }
+
+  function updateSwitches(closed, open) {
+    document.getElementById('sw-closed').innerHTML = closed
+      ? '<span style="color:var(--green)">● ACTIVE</span>'
+      : '<span style="color:var(--text-dim)">○ INACTIVE</span>';
+    document.getElementById('sw-open').innerHTML = open
+      ? '<span style="color:var(--green)">● ACTIVE</span>'
+      : '<span style="color:var(--text-dim)">○ INACTIVE</span>';
+  }
+
+  // ── Simulation Engine ──
+  let simTimer = null;
+  let simTime = 0;       // ms
+  let simRunning = false;
+  let simQueue = [];      // queued events
+
+  const fsmTransitions = {
+    CLOSED:     { person: 'OPENING' },
+    OPENING:    { limitOpen: 'OPEN_HOLD', fault: 'FAULT' },
+    OPEN_HOLD:  { timerDone: 'CLOSING', person: 'OPEN_HOLD' },
+    CLOSING:    { limitClosed: 'CLOSED', obstruct: 'OBSTRUCTED', fault: 'FAULT' },
+    OBSTRUCTED: { decelDone: 'OPENING' },
+    FAULT:      {},
+  };
+
+  // Auto-events: after entering a state, schedule follow-up
+  const autoEvents = {
+    OPENING:    { event: 'limitOpen',  delay: 2100 },
+    OPEN_HOLD:  { event: 'timerDone',  delay: 5000 },
+    CLOSING:    { event: 'limitClosed', delay: 2100 },
+    OBSTRUCTED: { event: 'decelDone',  delay: 200  },
+  };
+
+  function fmtTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = String(Math.floor(s / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    const mil = String(ms % 1000).padStart(3, '0');
+    return m + ':' + sec + '.' + mil;
+  }
+
+  function logMsg(msg, cls) {
+    const box = document.getElementById('log-box');
+    const div = document.createElement('div');
+    div.innerHTML = '<span class="ts">' + fmtTime(simTime) + '</span> ' +
+      '<span class="' + (cls||'ev') + '">' + msg + '</span>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function simTransition(event) {
+    const next = fsmTransitions[currentState] && fsmTransitions[currentState][event];
+    if (!next) return;
+    logMsg(currentState + ' → ' + next + '  [' + event + ']');
+    currentState = next;
+    renderState();
+
+    // Clear pending auto-events
+    simQueue = simQueue.filter(e => e.auto !== true);
+
+    // Schedule auto follow-up
+    const ae = autoEvents[currentState];
+    if (ae) {
+      simQueue.push({ time: simTime + ae.delay, event: ae.event, auto: true });
+    }
+  }
+
+  function simTick() {
+    simTime += 50;
+    // Process queued events
+    const due = simQueue.filter(e => e.time <= simTime);
+    simQueue = simQueue.filter(e => e.time > simTime);
+    due.forEach(e => simTransition(e.event));
+
+    // Animate distance during OPENING/CLOSING
+    if (currentState === 'OPENING') {
+      const progress = Math.random() * 5 + 30;
+      updateDist(Math.round(progress));
+    } else if (currentState === 'CLOSING') {
+      const progress = Math.random() * 30 + 70;
+      updateDist(Math.round(progress));
+    }
+  }
+
+  window.simStart = function() {
+    if (simRunning) return;
+    simRunning = true;
+    logMsg('Simulation started', 'ev');
+    simTimer = setInterval(simTick, 50);
+  };
+
+  window.simPause = function() {
+    if (!simRunning) return;
+    simRunning = false;
+    clearInterval(simTimer);
+    logMsg('Simulation paused', 'warn');
+  };
+
+  window.simReset = function() {
+    simRunning = false;
+    clearInterval(simTimer);
+    simTime = 0;
+    simQueue = [];
+    currentState = 'CLOSED';
+    renderState();
+    document.getElementById('log-box').innerHTML =
+      '<div><span class="ts">00:00.000</span> System initialised — state CLOSED</div>';
+  };
+
+  window.simInject = function(type) {
+    if (!simRunning && type !== 'fault') {
+      logMsg('Start simulation first', 'warn');
+      return;
+    }
+    switch(type) {
+      case 'person':
+        logMsg('Person detected at 45 cm', 'ev');
+        simTransition('person');
+        break;
+      case 'obstruct':
+        logMsg('Obstruction at 30 cm', 'warn');
+        simTransition('obstruct');
+        break;
+      case 'clear':
+        logMsg('Path cleared — distance 150 cm', 'ev');
+        updateDist(150);
+        break;
+      case 'fault':
+        logMsg('Manual fault injection!', 'err');
+        simTransition('fault');
+        break;
+    }
+  };
+
+  // Initial render
+  renderState();
+
+})();
+</script>
+</body>
+</html>
